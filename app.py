@@ -16,11 +16,11 @@ dni_tygodnia = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sob
 
 data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/YYYY")
 
-# 2. Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
+# Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
 st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# 1. Zmiana nazwy pola na "Rezerwacja od godziny"
-poczatkowa_godzina = st.time_input("Rezerwacja od godziny", value=time(7, 0))
+# Zmiana 2: Interwały co 30 minut (1800 sekund) na liście rozwijanej
+poczatkowa_godzina = st.time_input("Rezerwacja od godziny", value=time(7, 0), step=1800)
 
 # Nazwa pola z minutami
 czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
@@ -73,7 +73,7 @@ if st.button("Szukaj"):
                 m = int(minuty % 60)
                 return f"{h:02d}:{m:02d}"
                 
-            # 3. NAPRAWA BŁĘDU: Czas z komponentu pobieramy wprost, bez dodawania PRZESUNIECIA
+            # Czas z komponentu pobieramy wprost, bez dodawania PRZESUNIECIA
             min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute)
                 
             korty = {}
@@ -108,7 +108,8 @@ if st.button("Szukaj"):
                                 
             wynik = sorted(wynik, key=lambda x: x["sortowanie"])
             
-            st.write(f"Znaleziono {len(wynik)} terminów:")
+            # Zmiana 1: Nowy format komunikatu podsumowującego
+            st.write(f"Znalezione wolne terminy - {len(wynik)}:")
             
             if wynik:
                 for w in wynik:
