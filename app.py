@@ -5,22 +5,24 @@ from datetime import datetime, time
 # Konfiguracja strony
 st.set_page_config(page_title="Padel Dashboard", page_icon="🎾")
 
-# Inicjalizacja "pamięci" aplikacji dla czerwonego komunikatu
+# Inicjalizacja pamięci aplikacji dla czerwonego komunikatu
 if "searched" not in st.session_state:
     st.session_state.searched = False
 
 st.title("Padel Dashboard")
 
-# 5. Słownik polskich dni tygodnia i inputs
+# Słownik polskich dni tygodnia
 dni_tygodnia = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
 
 data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/YYYY")
-st.caption(f"Wybrany dzień: **{data_input.strftime('%d/%m/%Y')} - {dni_tygodnia[data_input.weekday()]}**")
 
-# 4. Feature: Początkowa godzina (domyślnie 7:00)
-poczatkowa_godzina = st.time_input("Początkowa godzina", value=time(7, 0))
+# 2. Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
+st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# 3. Powrót do poprzedniej nazwy
+# 1. Zmiana nazwy pola na "Rezerwacja od godziny"
+poczatkowa_godzina = st.time_input("Rezerwacja od godziny", value=time(7, 0))
+
+# Nazwa pola z minutami
 czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
 
 # Tłumaczenie minut na format godzinowy
@@ -35,13 +37,12 @@ else:
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
-# 2. Rezerwacja miejsca na czerwony komunikat
+# Rezerwacja miejsca na czerwony komunikat
 warning_placeholder = st.empty()
 if not st.session_state.searched:
     warning_placeholder.markdown("<p style='color:red; font-size:0.9em; font-style:italic;'>Pierwsze wyszukiwanie może trwać maksymalnie 60 sekund z uwagi na wybudzenie serwera</p>", unsafe_allow_html=True)
 
 if st.button("Szukaj"):
-    # Zapisanie w pamięci, że wykonano pierwsze szukanie i natychmiastowe ukrycie komunikatu
     st.session_state.searched = True
     warning_placeholder.empty()
     
@@ -49,7 +50,6 @@ if st.button("Szukaj"):
         format_daty = data_input.strftime('%Y-%m-%d')
         api_url = f"https://padel-dashboard-api.onrender.com/korty?data={format_daty}"
         
-        # 1. Zmiana komunikatu spinnera
         with st.spinner("Szukam kortów..."):
             response = requests.get(api_url, timeout=60)
             
@@ -62,7 +62,7 @@ if st.button("Szukaj"):
                 
             wymagane_minuty = int(czas_trwania)
             wymagane_sloty = int(wymagane_minuty / 30)
-            PRZESUNIECIE = 120 # Przesunięcie strefy czasowej (2 godziny)
+            PRZESUNIECIE = 120 # Przesunięcie dla danych z API
             
             def w_minuty(czas_str):
                 h, m = map(int, czas_str.split(':'))
@@ -73,8 +73,8 @@ if st.button("Szukaj"):
                 m = int(minuty % 60)
                 return f"{h:02d}:{m:02d}"
                 
-            # Obliczenie minimum minutowego dla filtru początkowej godziny
-            min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute) + PRZESUNIECIE
+            # 3. NAPRAWA BŁĘDU: Czas z komponentu pobieramy wprost, bez dodawania PRZESUNIECIA
+            min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute)
                 
             korty = {}
             for t in terminy:
@@ -97,7 +97,7 @@ if st.button("Szukaj"):
                                 break
                         if ciagle:
                             start = czasy[i]
-                            # 4. Sprawdzenie, czy znaleziona godzina jest późniejsza lub równa ustawionej w filtrze
+                            # Sprawdzenie poprawnie przeliczonej godziny początkowej
                             if start >= min_godzina_start:
                                 end = start + wymagane_minuty
                                 wynik.append({
