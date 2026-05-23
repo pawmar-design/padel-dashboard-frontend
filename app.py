@@ -1,20 +1,29 @@
 import streamlit as st
 import requests
-from datetime import datetime
+from datetime import datetime, time
 
 # Konfiguracja strony
 st.set_page_config(page_title="Padel Dashboard", page_icon="🎾")
 
-# 1. Tytuł bez paletki
+# Inicjalizacja "pamięci" aplikacji dla czerwonego komunikatu
+if "searched" not in st.session_state:
+    st.session_state.searched = False
+
 st.title("Padel Dashboard")
 
-# Inputs
-data_input = st.date_input("Wybierz datę", value=datetime.now())
+# 5. Słownik polskich dni tygodnia i inputs
+dni_tygodnia = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
 
-# 2 & 3. Zmiana nazwy, min_value=30 (zapobiega błędowi 0 minut), max_value=300 (5h)
-czas_trwania = st.number_input("Czas trwania rezerwacji", min_value=30, max_value=300, value=90, step=30)
+data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/YYYY")
+st.caption(f"Wybrany dzień: **{data_input.strftime('%d/%m/%Y')} - {dni_tygodnia[data_input.weekday()]}**")
 
-# Dodatkowy bajer: tłumaczenie minut na czytelny format godzinowy pod polem
+# 4. Feature: Początkowa godzina (domyślnie 7:00)
+poczatkowa_godzina = st.time_input("Początkowa godzina", value=time(7, 0))
+
+# 3. Powrót do poprzedniej nazwy
+czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
+
+# Tłumaczenie minut na format godzinowy
 godziny = czas_trwania // 60
 minuty_reszta = czas_trwania % 60
 if godziny > 0 and minuty_reszta > 0:
@@ -26,25 +35,31 @@ else:
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
+# 2. Rezerwacja miejsca na czerwony komunikat
+warning_placeholder = st.empty()
+if not st.session_state.searched:
+    warning_placeholder.markdown("<p style='color:red; font-size:0.9em; font-style:italic;'>Pierwsze wyszukiwanie może trwać maksymalnie 60 sekund z uwagi na wybudzenie serwera</p>", unsafe_allow_html=True)
+
 if st.button("Szukaj"):
+    # Zapisanie w pamięci, że wykonano pierwsze szukanie i natychmiastowe ukrycie komunikatu
+    st.session_state.searched = True
+    warning_placeholder.empty()
+    
     try:
-        # Wymuszenie formatu YYYY-MM-DD dla API
         format_daty = data_input.strftime('%Y-%m-%d')
         api_url = f"https://padel-dashboard-api.onrender.com/korty?data={format_daty}"
         
-        # 4. Połączony komunikat (Streamlit nie pozwala na zmianę w trakcie blokującego zapytania)
-        with st.spinner("Szukam kortów... (Jeśli to trwa dłużej, serwer się budzi ZzZz...)"):
+        # 1. Zmiana komunikatu spinnera
+        with st.spinner("Szukam kortów..."):
             response = requests.get(api_url, timeout=60)
             
         if response.status_code == 200:
             data_json = response.json()
             
-            # 1. Zbieranie wszystkich terminów z API
             terminy = []
             for klub in data_json.get("wyniki", []):
                 terminy.extend(klub.get("dostepne_terminy", []))
                 
-            # 2. Przeliczanie parametrów
             wymagane_minuty = int(czas_trwania)
             wymagane_sloty = int(wymagane_minuty / 30)
             PRZESUNIECIE = 120 # Przesunięcie strefy czasowej (2 godziny)
@@ -58,7 +73,9 @@ if st.button("Szukaj"):
                 m = int(minuty % 60)
                 return f"{h:02d}:{m:02d}"
                 
-            # 3. Grupowanie terminów po konkretnych kortach
+            # Obliczenie minimum minutowego dla filtru początkowej godziny
+            min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute) + PRZESUNIECIE
+                
             korty = {}
             for t in terminy:
                 nazwa_kortu = t.get("kort")
@@ -68,7 +85,6 @@ if st.button("Szukaj"):
                         korty[nazwa_kortu] = []
                     korty[nazwa_kortu].append(w_minuty(godzina))
                     
-            # 4. Algorytm szukania ciągłych bloków czasowych
             wynik = []
             for nazwa_kortu, czasy in korty.items():
                 czasy = sorted(czasy)
@@ -81,14 +97,15 @@ if st.button("Szukaj"):
                                 break
                         if ciagle:
                             start = czasy[i]
-                            end = start + wymagane_minuty
-                            wynik.append({
-                                "Kort": nazwa_kortu,
-                                "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
-                                "sortowanie": start
-                            })
-                            
-            # 5. Wyświetlanie wyników
+                            # 4. Sprawdzenie, czy znaleziona godzina jest późniejsza lub równa ustawionej w filtrze
+                            if start >= min_godzina_start:
+                                end = start + wymagane_minuty
+                                wynik.append({
+                                    "Kort": nazwa_kortu,
+                                    "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
+                                    "sortowanie": start
+                                })
+                                
             wynik = sorted(wynik, key=lambda x: x["sortowanie"])
             
             st.write(f"Znaleziono {len(wynik)} terminów:")
