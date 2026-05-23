@@ -5,11 +5,26 @@ from datetime import datetime
 # Konfiguracja strony
 st.set_page_config(page_title="Padel Dashboard", page_icon="🎾")
 
-st.title("🎾 Padel Dashboard")
+# 1. Tytuł bez paletki
+st.title("Padel Dashboard")
 
 # Inputs
 data_input = st.date_input("Wybierz datę", value=datetime.now())
-czas_trwania = st.number_input("Czas trwania (minuty)", value=90, step=30)
+
+# 2 & 3. Zmiana nazwy, min_value=30 (zapobiega błędowi 0 minut), max_value=300 (5h)
+czas_trwania = st.number_input("Czas trwania rezerwacji", min_value=30, max_value=300, value=90, step=30)
+
+# Dodatkowy bajer: tłumaczenie minut na czytelny format godzinowy pod polem
+godziny = czas_trwania // 60
+minuty_reszta = czas_trwania % 60
+if godziny > 0 and minuty_reszta > 0:
+    format_wyswietlany = f"{godziny}h {minuty_reszta}min"
+elif godziny > 0:
+    format_wyswietlany = f"{godziny}h"
+else:
+    format_wyswietlany = f"{minuty_reszta}min"
+    
+st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
 if st.button("Szukaj"):
     try:
@@ -17,9 +32,8 @@ if st.button("Szukaj"):
         format_daty = data_input.strftime('%Y-%m-%d')
         api_url = f"https://padel-dashboard-api.onrender.com/korty?data={format_daty}"
         
-        # OTO TWOJA ZMIANA: Niestandardowy komunikat podczas ładowania/wybudzania
-        with st.spinner("Serwer się budzi ZzZz..."):
-            # Zwiększony timeout (60s), bo darmowy serwer Render czasem "zasypia"
+        # 4. Połączony komunikat (Streamlit nie pozwala na zmianę w trakcie blokującego zapytania)
+        with st.spinner("Szukam kortów... (Jeśli to trwa dłużej, serwer się budzi ZzZz...)"):
             response = requests.get(api_url, timeout=60)
             
         if response.status_code == 200:
@@ -30,7 +44,7 @@ if st.button("Szukaj"):
             for klub in data_json.get("wyniki", []):
                 terminy.extend(klub.get("dostepne_terminy", []))
                 
-            # 2. Przeliczanie parametrów (logika z Retoola)
+            # 2. Przeliczanie parametrów
             wymagane_minuty = int(czas_trwania)
             wymagane_sloty = int(wymagane_minuty / 30)
             PRZESUNIECIE = 120 # Przesunięcie strefy czasowej (2 godziny)
@@ -80,7 +94,6 @@ if st.button("Szukaj"):
             st.write(f"Znaleziono {len(wynik)} terminów:")
             
             if wynik:
-                # Usunięcie klucza "sortowanie" by nie śmiecił w tabeli
                 for w in wynik:
                     del w["sortowanie"]
                 st.dataframe(wynik, use_container_width=True)
