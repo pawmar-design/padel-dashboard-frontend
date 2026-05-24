@@ -19,8 +19,8 @@ data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/
 # Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
 st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# Zmiana 2: Interwały co 30 minut (1800 sekund) na liście rozwijanej
-poczatkowa_godzina = st.time_input("Rezerwacja od godziny", value=time(7, 0), step=1800)
+# POPRAWKA: Zmiana nazwy na "Rezerwacje od godziny"
+poczatkowa_godzina = st.time_input("Rezerwacje od godziny", value=time(7, 0), step=1800)
 
 # Nazwa pola z minutami
 czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
@@ -108,7 +108,7 @@ if st.button("Szukaj"):
                                 
             wynik = sorted(wynik, key=lambda x: x["sortowanie"])
             
-            # Zmiana 1: Nowy format komunikatu podsumowującego
+            # Nowy format komunikatu podsumowującego
             st.write(f"Znalezione wolne terminy - {len(wynik)}:")
             
             if wynik:
