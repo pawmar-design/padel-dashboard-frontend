@@ -19,7 +19,7 @@ data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/
 # Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
 st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# POPRAWKA: Zmiana nazwy na "Rezerwacje od godziny"
+# Interwały co 30 minut (1800 sekund) na liście rozwijanej
 poczatkowa_godzina = st.time_input("Rezerwacje od godziny", value=time(7, 0), step=1800)
 
 # Nazwa pola z minutami
@@ -36,6 +36,10 @@ else:
     format_wyswietlany = f"{minuty_reszta}min"
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
+
+# --- NOWY FEATURE: Filtr klubów zaktualizowany o dane z main.py ---
+lista_klubow = ["Pura", "Fast", "Padel Park"]
+wybrane_kluby = st.multiselect("Wybór klubów", options=lista_klubow, default=lista_klubow)
 
 # Rezerwacja miejsca na czerwony komunikat
 warning_placeholder = st.empty()
@@ -58,7 +62,12 @@ if st.button("Szukaj"):
             
             terminy = []
             for klub in data_json.get("wyniki", []):
-                terminy.extend(klub.get("dostepne_terminy", []))
+                # Zabezpieczenie: pobieramy nazwę klubu z JSONa 
+                nazwa_klubu = klub.get("klub")
+                
+                # Dodajemy terminy tylko wtedy, gdy klub znajduje się na liście wybranych w filtrze
+                if nazwa_klubu in wybrane_kluby:
+                    terminy.extend(klub.get("dostepne_terminy", []))
                 
             wymagane_minuty = int(czas_trwania)
             wymagane_sloty = int(wymagane_minuty / 30)
@@ -116,7 +125,7 @@ if st.button("Szukaj"):
                     del w["sortowanie"]
                 st.dataframe(wynik, use_container_width=True)
             else:
-                st.info("Brak kortów w wyznaczonym czasie")
+                st.info("Brak kortów w wyznaczonym czasie i wybranych klubach")
                 
         else:
             st.error(f"Błąd API: {response.status_code}")
