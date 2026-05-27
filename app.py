@@ -130,7 +130,7 @@ if st.button("Szukaj"):
                         del w["sortowanie"]
                     st.dataframe(wynik, use_container_width=True)
                 else:
-                    st.info("Brak kortów w wyznaczonym czasie i wybranych klubach")
+                    st.info("Brak kortów w wyznaczonym czasie")
                     
             else:
                 st.error(f"Błąd API: {response.status_code}")
