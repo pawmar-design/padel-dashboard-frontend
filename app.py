@@ -38,8 +38,7 @@ else:
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
 # --- ZAKTUALIZOWANY FEATURE: Filtr klubów ---
-lista_klubow = ["Pura", "Fast", "Padel Park", "Tenispoint"]
-# Zmiana 1: Dodanie parametru 'placeholder'
+lista_klubow = ["Pura", "Fast", "Padel Park", "Tennispoint"]
 wybrane_kluby = st.multiselect(
     "Wybór klubów", 
     options=lista_klubow, 
@@ -56,7 +55,6 @@ if st.button("Szukaj"):
     st.session_state.searched = True
     warning_placeholder.empty()
     
-    # Zmiana 2: Zabezpieczenie przed wyszukiwaniem bez wybranych klubów
     if not wybrane_kluby:
         st.error("Nie wybrano żadnego klubu")
     else:
@@ -79,7 +77,10 @@ if st.button("Szukaj"):
                     
                 wymagane_minuty = int(czas_trwania)
                 wymagane_sloty = int(wymagane_minuty / 30)
-                PRZESUNIECIE = 120 # Przesunięcie dla danych z API
+                
+                # BARDZO WAŻNE: Skrypt na backendzie (main.py) zwraca teraz prawidłowy polski czas
+                # Zmieniamy przesunięcie z 120 na 0!
+                PRZESUNIECIE = 0
                 
                 def w_minuty(czas_str):
                     h, m = map(int, czas_str.split(':'))
@@ -130,7 +131,7 @@ if st.button("Szukaj"):
                         del w["sortowanie"]
                     st.dataframe(wynik, use_container_width=True)
                 else:
-                    st.info("Brak kortów w wyznaczonym czasie")
+                    st.info("Brak kortów w wyznaczonym czasie i wybranych klubach")
                     
             else:
                 st.error(f"Błąd API: {response.status_code}")
