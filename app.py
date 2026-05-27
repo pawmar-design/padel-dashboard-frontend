@@ -37,8 +37,8 @@ else:
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
-# --- ZAKTUALIZOWANY FEATURE: Filtr klubów ---
-lista_klubow = ["Pura", "Fast", "Padel Park", "Tennispoint"]
+# Filtr klubów (Zaktualizowana nazwa na Tenispoint)
+lista_klubow = ["Pura", "Fast", "Padel Park", "Tenispoint"]
 wybrane_kluby = st.multiselect(
     "Wybór klubów", 
     options=lista_klubow, 
@@ -71,15 +71,21 @@ if st.button("Szukaj"):
                 terminy = []
                 for klub in data_json.get("wyniki", []):
                     nazwa_klubu = klub.get("klub")
+                    status = klub.get("status", "sukces")
+                    
+                    # Wychwytywanie błędów bezpośrednio z API przed załadowaniem kortów
+                    if status == "403":
+                        st.warning(f"⚠️ Odmowa serwera dla klubu {nazwa_klubu}")
+                        continue  # Pomija błędny klub, pozwala działać innym
+                    elif status != "sukces":
+                        st.warning(f"⚠️ Problem z klubem {nazwa_klubu}: {status}")
+                        continue
                     
                     if nazwa_klubu in wybrane_kluby:
                         terminy.extend(klub.get("dostepne_terminy", []))
                     
                 wymagane_minuty = int(czas_trwania)
                 wymagane_sloty = int(wymagane_minuty / 30)
-                
-                # BARDZO WAŻNE: Skrypt na backendzie (main.py) zwraca teraz prawidłowy polski czas
-                # Zmieniamy przesunięcie z 120 na 0!
                 PRZESUNIECIE = 0
                 
                 def w_minuty(czas_str):
@@ -131,7 +137,7 @@ if st.button("Szukaj"):
                         del w["sortowanie"]
                     st.dataframe(wynik, use_container_width=True)
                 else:
-                    st.info("Brak kortów w wyznaczonym czasie i wybranych klubach")
+                    st.info("Brak kortów w wyznaczonym czasie") # Zaktualizowany komunikat
                     
             else:
                 st.error(f"Błąd API: {response.status_code}")
