@@ -38,7 +38,7 @@ else:
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
 # --- ZAKTUALIZOWANY FEATURE: Filtr klubów ---
-lista_klubow = ["Pura", "Fast", "Padel Park"]
+lista_klubow = ["Pura", "Fast", "Padel Park", "Tennispoint"]
 # Zmiana 1: Dodanie parametru 'placeholder'
 wybrane_kluby = st.multiselect(
     "Wybór klubów", 
