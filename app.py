@@ -103,4 +103,63 @@ if st.button("Szukaj"):
                     nazwa_kortu = t.get("kort")
                     godzina = t.get("godzina")
                     link = t.get("link", "")
-                    if nazwa_
+                    if nazwa_kortu and godzina:
+                        if nazwa_kortu not in korty:
+                            korty[nazwa_kortu] = []
+                        korty[nazwa_kortu].append((w_minuty(godzina), link))
+                        
+                wynik = []
+                for nazwa_kortu, czasy_z_linkami in korty.items():
+                    czasy_z_linkami = sorted(czasy_z_linkami, key=lambda x: x[0])
+                    
+                    if len(czasy_z_linkami) >= wymagane_sloty:
+                        for i in range(len(czasy_z_linkami) - wymagane_sloty + 1):
+                            ciagle = True
+                            for j in range(1, wymagane_sloty):
+                                if czasy_z_linkami[i + j][0] != czasy_z_linkami[i][0] + (j * 30):
+                                    ciagle = False
+                                    break
+                            if ciagle:
+                                start = czasy_z_linkami[i][0]
+                                pierwszy_link = czasy_z_linkami[i][1]
+                                
+                                if start >= min_godzina_start:
+                                    end = start + wymagane_minuty
+                                    
+                                    # Łączymy wszystko do jednej wspólnej kolumny linków
+                                    wynik.append({
+                                        "Kort": nazwa_kortu,
+                                        "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
+                                        "Link do rezerwacji": pierwszy_link,
+                                        "sortowanie": start
+                                    })
+                                    
+                wynik = sorted(wynik, key=lambda x: x["sortowanie"])
+                
+                st.write(f"Znalezione wolne terminy - {len(wynik)}:")
+                
+                if wynik:
+                    for w in wynik:
+                        del w["sortowanie"]
+                    
+                    # Konfiguracja tabeli z jedną, wspólną kolumną linków
+                    st.dataframe(
+                        wynik, 
+                        use_container_width=True,
+                        column_config={
+                            "Link do rezerwacji": st.column_config.LinkColumn(
+                                "Link do rezerwacji", 
+                                display_text="Link do rezerwacji"
+                            )
+                        }
+                    )
+                else:
+                    st.info("Brak kortów w wyznaczonym czasie")
+                    
+            else:
+                st.error(f"Błąd API: {response.status_code}")
+                
+        except requests.exceptions.Timeout:
+            st.error("Przekroczono czas oczekiwania. Kliknij 'Szukaj' jeszcze raz za 30 sekund.")
+        except Exception as e:
+            st.error(f"Wystąpił nieoczekiwany błąd: {e}")
