@@ -37,7 +37,7 @@ else:
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
-# Filtr klubów (Zaktualizowana nazwa na Tenispoint)
+# Filtr klubów
 lista_klubow = ["Pura", "Fast", "Padel Park", "Tenispoint"]
 wybrane_kluby = st.multiselect(
     "Wybór klubów", 
@@ -73,10 +73,9 @@ if st.button("Szukaj"):
                     nazwa_klubu = klub.get("klub")
                     status = klub.get("status", "sukces")
                     
-                    # Wychwytywanie błędów bezpośrednio z API przed załadowaniem kortów
                     if status == "403":
                         st.warning(f"⚠️ Odmowa serwera dla klubu {nazwa_klubu}")
-                        continue  # Pomija błędny klub, pozwala działać innym
+                        continue
                     elif status != "sukces":
                         st.warning(f"⚠️ Problem z klubem {nazwa_klubu}: {status}")
                         continue
@@ -103,30 +102,47 @@ if st.button("Szukaj"):
                 for t in terminy:
                     nazwa_kortu = t.get("kort")
                     godzina = t.get("godzina")
+                    link = t.get("link", "")
                     if nazwa_kortu and godzina:
                         if nazwa_kortu not in korty:
                             korty[nazwa_kortu] = []
-                        korty[nazwa_kortu].append(w_minuty(godzina))
+                        # Przechowujemy krotkę (minuty, URL)
+                        korty[nazwa_kortu].append((w_minuty(godzina), link))
                         
                 wynik = []
-                for nazwa_kortu, czasy in korty.items():
-                    czasy = sorted(czasy)
-                    if len(czasy) >= wymagane_sloty:
-                        for i in range(len(czasy) - wymagane_sloty + 1):
+                for nazwa_kortu, czasy_z_linkami in korty.items():
+                    # Sortujemy po minutach
+                    czasy_z_linkami = sorted(czasy_z_linkami, key=lambda x: x[0])
+                    
+                    if len(czasy_z_linkami) >= wymagane_sloty:
+                        for i in range(len(czasy_z_linkami) - wymagane_sloty + 1):
                             ciagle = True
                             for j in range(1, wymagane_sloty):
-                                if czasy[i + j] != czasy[i] + (j * 30):
+                                if czasy_z_linkami[i + j][0] != czasy_z_linkami[i][0] + (j * 30):
                                     ciagle = False
                                     break
                             if ciagle:
-                                start = czasy[i]
+                                start = czasy_z_linkami[i][0]
+                                pierwszy_link = czasy_z_linkami[i][1]
+                                
                                 if start >= min_godzina_start:
                                     end = start + wymagane_minuty
-                                    wynik.append({
+                                    
+                                    row = {
                                         "Kort": nazwa_kortu,
                                         "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
+                                        "Link do rezerwacji": None,
+                                        "Link do kalendarza klubu": None,
                                         "sortowanie": start
-                                    })
+                                    }
+                                    
+                                    # Rozdzielamy linki na odpowiednie kolumny w zależności od platformy
+                                    if "tenis4u.pl" in pierwszy_link:
+                                        row["Link do kalendarza klubu"] = pierwszy_link
+                                    else:
+                                        row["Link do rezerwacji"] = pierwszy_link
+                                        
+                                    wynik.append(row)
                                     
                 wynik = sorted(wynik, key=lambda x: x["sortowanie"])
                 
@@ -135,9 +151,24 @@ if st.button("Szukaj"):
                 if wynik:
                     for w in wynik:
                         del w["sortowanie"]
-                    st.dataframe(wynik, use_container_width=True)
+                    
+                    # Konfiguracja wyświetlania tabeli z ukrytymi URL pod czystym tekstem
+                    st.dataframe(
+                        wynik, 
+                        use_container_width=True,
+                        column_config={
+                            "Link do rezerwacji": st.column_config.LinkColumn(
+                                "Link do rezerwacji", 
+                                display_text="Link do rezerwacji"
+                            ),
+                            "Link do kalendarza klubu": st.column_config.LinkColumn(
+                                "Link do kalendarza klubu", 
+                                display_text="Link do kalendarza klubu"
+                            )
+                        }
+                    )
                 else:
-                    st.info("Brak kortów w wyznaczonym czasie") # Zaktualizowany komunikat
+                    st.info("Brak kortów w wyznaczonym czasie")
                     
             else:
                 st.error(f"Błąd API: {response.status_code}")
