@@ -5,21 +5,17 @@ from datetime import datetime, time
 # Konfiguracja strony
 st.set_page_config(page_title="Padel Dashboard", page_icon="🎾")
 
-# Inicjalizacja pamięci aplikacji dla czerwonego komunikatu
 if "searched" not in st.session_state:
     st.session_state.searched = False
 
 st.title("Padel Dashboard")
 
-# Słownik polskich dni tygodnia
 dni_tygodnia = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
-
 data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/YYYY")
 
-# Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
 st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# --- NOWA SEKCJA: PRZEDZIAŁ CZASOWY ---
+# --- SEKCJA: PRZEDZIAŁ CZASOWY ---
 st.markdown("**Przedział czasowy:**")
 col1, col2 = st.columns(2)
 
@@ -27,13 +23,12 @@ with col1:
     poczatkowa_godzina = st.time_input("Od:", value=time(7, 0), step=1800)
 
 with col2:
-    koncowa_godzina = st.time_input("Do:", value=time(23, 30), step=1800)
-# --------------------------------------
+    # ZMIANA 1: Domyślnie ustawione na 00:00 (północ)
+    koncowa_godzina = st.time_input("Do:", value=time(0, 0), step=1800)
 
 # Nazwa pola z minutami
 czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
 
-# Tłumaczenie minut na format godzinowy
 godziny = czas_trwania // 60
 minuty_reszta = czas_trwania % 60
 if godziny > 0 and minuty_reszta > 0:
@@ -45,7 +40,6 @@ else:
     
 st.caption(f"Wybrany czas: **{format_wyswietlany}**")
 
-# Filtr klubów 
 lista_klubow = ["Pura", "Fast", "Padel Park", "Tenispoint"]
 wybrane_kluby = st.multiselect(
     "Wybór klubów", 
@@ -54,7 +48,6 @@ wybrane_kluby = st.multiselect(
     placeholder="Wybierz klub"
 )
 
-# Rezerwacja miejsca na czerwony komunikat
 warning_placeholder = st.empty()
 if not st.session_state.searched:
     warning_placeholder.markdown("<p style='color:red; font-size:0.9em; font-style:italic;'>Pierwsze wyszukiwanie może trwać maksymalnie 60 sekund z uwagi na wybudzenie serwera</p>", unsafe_allow_html=True)
@@ -66,9 +59,8 @@ if st.button("Szukaj"):
     if not wybrane_kluby:
         st.error("Nie wybrano żadnego klubu")
     else:
-        # Podstawowa walidacja czasu
         if poczatkowa_godzina >= koncowa_godzina and koncowa_godzina != time(0,0):
-            st.warning("Godzina końcowa musi być późniejsza niż godzina początkkowa!")
+            st.warning("Godzina końcowa musi być późniejsza niż godzina początkowa!")
         else:
             try:
                 format_daty = data_input.strftime('%Y-%m-%d')
@@ -85,10 +77,9 @@ if st.button("Szukaj"):
                         nazwa_klubu = klub.get("klub")
                         status = klub.get("status", "sukces")
                         
-                        # Wychwytywanie błędów bezpośrednio z API przed załadowaniem kortów
                         if status == "403":
                             st.warning(f"⚠️ Odmowa serwera dla klubu {nazwa_klubu}")
-                            continue  # Pomija błędny klub, pozwala działać innym
+                            continue  
                         elif status != "sukces":
                             st.warning(f"⚠️ Problem z klubem {nazwa_klubu}: {status}")
                             continue
@@ -109,26 +100,26 @@ if st.button("Szukaj"):
                         m = int(minuty % 60)
                         return f"{h:02d}:{m:02d}"
                         
-                    # Obliczenie limitów czasu w minutach od północy
                     min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute)
                     max_godzina_end = (koncowa_godzina.hour * 60 + koncowa_godzina.minute)
                     
-                    # Jeśli użytkownik ustawi "Do: 00:00", traktujemy to jako północ (koniec dnia)
                     if max_godzina_end == 0:
                         max_godzina_end = 1440
                         
+                    # ZMIANA 2: Słownik przechowuje teraz strukturę: nazwa_kortu -> { minuta_startu: link }
                     korty = {}
                     for t in terminy:
                         nazwa_kortu = t.get("kort")
                         godzina = t.get("godzina")
+                        link = t.get("link", "")
                         if nazwa_kortu and godzina:
                             if nazwa_kortu not in korty:
-                                korty[nazwa_kortu] = []
-                            korty[nazwa_kortu].append(w_minuty(godzina))
+                                korty[nazwa_kortu] = {}
+                            korty[nazwa_kortu][w_minuty(godzina)] = link
                             
                     wynik = []
-                    for nazwa_kortu, czasy in korty.items():
-                        czasy = sorted(czasy)
+                    for nazwa_kortu, czasy_dict in korty.items():
+                        czasy = sorted(czasy_dict.keys())
                         if len(czasy) >= wymagane_sloty:
                             for i in range(len(czasy) - wymagane_sloty + 1):
                                 ciagle = True
@@ -140,11 +131,13 @@ if st.button("Szukaj"):
                                     start = czasy[i]
                                     end = start + wymagane_minuty
                                     
-                                    # KLUCZOWA ZMIANA: Sprawdzamy, czy cały blok mieści się w ramach czasowych
                                     if start >= min_godzina_start and end <= max_godzina_end:
+                                        # Pobranie linku powiązanego z pierwszą godziną bloku rezerwacji
+                                        link_rezerwacji = czasy_dict[start]
                                         wynik.append({
                                             "Kort": nazwa_kortu,
                                             "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
+                                            "Link": link_rezerwacji,
                                             "sortowanie": start
                                         })
                                         
@@ -155,7 +148,19 @@ if st.button("Szukaj"):
                     if wynik:
                         for w in wynik:
                             del w["sortowanie"]
-                        st.dataframe(wynik, use_container_width=True)
+                        
+                        # ZMIANA 3: Renderowanie tabeli z interaktywną kolumną z linkami
+                        st.dataframe(
+                            wynik, 
+                            use_container_width=True,
+                            column_config={
+                                "Link": st.column_config.LinkColumn(
+                                    "Rezerwacja",
+                                    help="Kliknij, aby przejść bezpośrednio do rezerwacji tego kortu",
+                                    display_text="Zarezerwuj ↗"
+                                )
+                            }
+                        )
                     else:
                         st.info("Brak kortów w wyznaczonym przedziale czasowym")
                         
