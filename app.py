@@ -19,8 +19,16 @@ data_input = st.date_input("Wybierz datę", value=datetime.now(), format="DD/MM/
 # Wyświetlanie samego dnia tygodnia (pogrubionego) pod datą
 st.caption(f"**{dni_tygodnia[data_input.weekday()]}**")
 
-# Interwały co 30 minut (1800 sekund) na liście rozwijanej
-poczatkowa_godzina = st.time_input("Rezerwacje od godziny", value=time(7, 0), step=1800)
+# --- NOWA SEKCJA: Przedział czasowy ---
+st.write("**Przedział czasowy:**")
+col1, col2 = st.columns(2)
+
+with col1:
+    poczatkowa_godzina = st.time_input("Od:", value=time(7, 0), step=1800)
+    
+with col2:
+    koncowa_godzina = st.time_input("Do:", value=time(23, 0), step=1800)
+# --------------------------------------
 
 # Nazwa pola z minutami
 czas_trwania = st.number_input("Czas trwania rezerwacji (minuty)", min_value=30, max_value=300, value=90, step=30)
@@ -96,70 +104,37 @@ if st.button("Szukaj"):
                     m = int(minuty % 60)
                     return f"{h:02d}:{m:02d}"
                     
+                # Przeliczenie wybranych godzin na minuty od początku dnia
                 min_godzina_start = (poczatkowa_godzina.hour * 60 + poczatkowa_godzina.minute)
+                max_godzina_end = (koncowa_godzina.hour * 60 + koncowa_godzina.minute)
+                
+                # Zabezpieczenie dla ustawienia "Do: 00:00" (traktujemy jako koniec dnia)
+                if max_godzina_end == 0:
+                    max_godzina_end = 1440
                     
                 korty = {}
                 for t in terminy:
                     nazwa_kortu = t.get("kort")
                     godzina = t.get("godzina")
-                    link = t.get("link", "")
                     if nazwa_kortu and godzina:
                         if nazwa_kortu not in korty:
                             korty[nazwa_kortu] = []
-                        korty[nazwa_kortu].append((w_minuty(godzina), link))
+                        korty[nazwa_kortu].append(w_minuty(godzina))
                         
                 wynik = []
-                for nazwa_kortu, czasy_z_linkami in korty.items():
-                    czasy_z_linkami = sorted(czasy_z_linkami, key=lambda x: x[0])
-                    
-                    if len(czasy_z_linkami) >= wymagane_sloty:
-                        for i in range(len(czasy_z_linkami) - wymagane_sloty + 1):
+                for nazwa_kortu, czasy in korty.items():
+                    czasy = sorted(czasy)
+                    if len(czasy) >= wymagane_sloty:
+                        for i in range(len(czasy) - wymagane_sloty + 1):
                             ciagle = True
                             for j in range(1, wymagane_sloty):
-                                if czasy_z_linkami[i + j][0] != czasy_z_linkami[i][0] + (j * 30):
+                                if czasy[i + j] != czasy[i] + (j * 30):
                                     ciagle = False
                                     break
                             if ciagle:
-                                start = czasy_z_linkami[i][0]
-                                pierwszy_link = czasy_z_linkami[i][1]
+                                start = czasy[i]
+                                end = start + wymagane_minuty
                                 
-                                if start >= min_godzina_start:
-                                    end = start + wymagane_minuty
-                                    
-                                    # Łączymy wszystko do jednej wspólnej kolumny linków
+                                # Sprawdzenie czy cały blok mieści się w przedziale czasowym użytkownika
+                                if start >= min_godzina_start and end <= max_godzina_end:
                                     wynik.append({
-                                        "Kort": nazwa_kortu,
-                                        "Godzina": f"{formatuj_czas(start)} - {formatuj_czas(end)}",
-                                        "Link do rezerwacji": pierwszy_link,
-                                        "sortowanie": start
-                                    })
-                                    
-                wynik = sorted(wynik, key=lambda x: x["sortowanie"])
-                
-                st.write(f"Znalezione wolne terminy - {len(wynik)}:")
-                
-                if wynik:
-                    for w in wynik:
-                        del w["sortowanie"]
-                    
-                    # Konfiguracja tabeli z jedną, wspólną kolumną linków
-                    st.dataframe(
-                        wynik, 
-                        use_container_width=True,
-                        column_config={
-                            "Link do rezerwacji": st.column_config.LinkColumn(
-                                "Link do rezerwacji", 
-                                display_text="Link do rezerwacji"
-                            )
-                        }
-                    )
-                else:
-                    st.info("Brak kortów w wyznaczonym czasie")
-                    
-            else:
-                st.error(f"Błąd API: {response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            st.error("Przekroczono czas oczekiwania. Kliknij 'Szukaj' jeszcze raz za 30 sekund.")
-        except Exception as e:
-            st.error(f"Wystąpił nieoczekiwany błąd: {e}")
