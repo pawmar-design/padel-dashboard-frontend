@@ -64,7 +64,7 @@ if st.button("Szukaj"):
         else:
             try:
                 format_daty = data_input.strftime('%Y-%m-%d')
-                api_url = f"https://padel-dashboard-api.onrender.com/korty?data={format_daty}"
+                api_url = f"http://127.0.0.1:8000/korty?data={format_daty}"
                 
                 with st.spinner("Szukam kortów..."):
                     response = requests.get(api_url, timeout=60)
